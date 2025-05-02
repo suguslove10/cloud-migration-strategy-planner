@@ -1,0 +1,28 @@
+# GitHub Push Instructions
+
+1. Create a new GitHub repository:
+   - Go to https://github.com/new
+   - Enter "cloud-migration-strategy-planner" as the Repository name
+   - Choose visibility (Public or Private)
+   - Click "Create repository"
+
+2. Add the remote repository (replace YOUR_USERNAME with your GitHub username):
+   ```
+   git remote add origin https://github.com/YOUR_USERNAME/cloud-migration-strategy-planner.git
+   ```
+
+3. Set the main branch name:
+   ```
+   git branch -M main
+   ```
+
+4. Push your code to GitHub:
+   ```
+   git push -u origin main
+   ```
+
+5. Verify your repository:
+   - Visit https://github.com/YOUR_USERNAME/cloud-migration-strategy-planner to see your code on GitHub
+
+Note: If you have two-factor authentication enabled, you may need to use a personal access token instead of your password.
+You can create a token at: https://github.com/settings/tokens 
