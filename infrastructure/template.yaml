@@ -1,0 +1,222 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Cloud Migration Strategy Planner Infrastructure
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    Description: Environment name
+    AllowedValues:
+      - dev
+      - prod
+
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 128
+    Runtime: nodejs18.x
+    Environment:
+      Variables:
+        ENVIRONMENT: !Ref Environment
+
+Resources:
+  # S3 Bucket for storing discovery data
+  DiscoveryDataBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub migration-planner-discovery-${AWS::AccountId}-${Environment}
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldVersions
+            Status: Enabled
+            ExpirationInDays: 30
+
+  # DynamoDB Table for migration metadata
+  MigrationMetadataTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub migration-planner-metadata-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: projectId
+          AttributeType: S
+        - AttributeName: resourceId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: projectId
+          KeyType: HASH
+        - AttributeName: resourceId
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  # Lambda Functions
+  DiscoveryProcessorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../backend/functions/discovery-processor/
+      Handler: index.handler
+      Description: Processes discovery data from AWS Application Discovery Service
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Ref DiscoveryDataBucket
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MigrationMetadataTable
+      Environment:
+        Variables:
+          DYNAMODB_TABLE: !Ref MigrationMetadataTable
+
+  MigrationAnalyzerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../backend/functions/migration-analyzer/
+      Handler: index.handler
+      Description: Analyzes data and recommends migration strategies
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Ref DiscoveryDataBucket
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MigrationMetadataTable
+      Environment:
+        Variables:
+          DYNAMODB_TABLE: !Ref MigrationMetadataTable
+
+  CostEstimatorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../backend/functions/cost-estimator/
+      Handler: index.handler
+      Description: Estimates costs for workload migration
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref MigrationMetadataTable
+      Environment:
+        Variables:
+          DYNAMODB_TABLE: !Ref MigrationMetadataTable
+
+  RoadmapGeneratorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../backend/functions/roadmap-generator/
+      Handler: index.handler
+      Description: Generates migration roadmap
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref MigrationMetadataTable
+      Environment:
+        Variables:
+          DYNAMODB_TABLE: !Ref MigrationMetadataTable
+
+  # API Gateway
+  MigrationPlannerApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref Environment
+      Cors:
+        AllowMethods: "'GET,POST,OPTIONS'"
+        AllowHeaders: "'Content-Type,Authorization'"
+        AllowOrigin: "'*'"
+
+  # API Gateway Lambda Integrations
+  GetMigrationAnalysisFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../backend/functions/api/
+      Handler: getMigrationAnalysis.handler
+      Description: API endpoint to get migration analysis
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref MigrationMetadataTable
+      Environment:
+        Variables:
+          DYNAMODB_TABLE: !Ref MigrationMetadataTable
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MigrationPlannerApi
+            Path: /analysis/{projectId}
+            Method: GET
+
+  GetCostEstimateFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../backend/functions/api/
+      Handler: getCostEstimate.handler
+      Description: API endpoint to get cost estimates
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref MigrationMetadataTable
+      Environment:
+        Variables:
+          DYNAMODB_TABLE: !Ref MigrationMetadataTable
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MigrationPlannerApi
+            Path: /costs/{projectId}
+            Method: GET
+
+  GetMigrationRoadmapFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../backend/functions/api/
+      Handler: getMigrationRoadmap.handler
+      Description: API endpoint to get migration roadmap
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref MigrationMetadataTable
+      Environment:
+        Variables:
+          DYNAMODB_TABLE: !Ref MigrationMetadataTable
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MigrationPlannerApi
+            Path: /roadmap/{projectId}
+            Method: GET
+
+  StartDiscoveryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../backend/functions/api/
+      Handler: startDiscovery.handler
+      Description: API endpoint to start discovery process
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MigrationMetadataTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - discovery:StartDataCollectionByAgentIds
+              Resource: "*"
+      Environment:
+        Variables:
+          DYNAMODB_TABLE: !Ref MigrationMetadataTable
+          S3_BUCKET_NAME: !Ref DiscoveryDataBucket
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MigrationPlannerApi
+            Path: /discovery/start
+            Method: POST
+
+Outputs:
+  ApiEndpoint:
+    Description: "API Gateway endpoint URL"
+    Value: !Sub "https://${MigrationPlannerApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/"
+  
+  DiscoveryBucket:
+    Description: "S3 bucket for discovery data"
+    Value: !Ref DiscoveryDataBucket
+  
+  MigrationMetadataTableName:
+    Description: "DynamoDB table for migration metadata"
+    Value: !Ref MigrationMetadataTable 
