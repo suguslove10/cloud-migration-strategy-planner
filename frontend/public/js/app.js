@@ -754,3 +754,667 @@ async function handleGenerateRoadmap() {
     elements.btnGenerateRoadmap.textContent = 'Generate Roadmap';
   }
 }
+
+// Add these functions at the beginning of the file
+document.addEventListener('DOMContentLoaded', function() {
+  // Initialize app
+  initApp();
+
+  // Register event listeners
+  registerEventListeners();
+
+  // Initialize UI
+  initUI();
+});
+
+// Register all event listeners
+function registerEventListeners() {
+  // Navigation
+  document.querySelectorAll('.nav-link').forEach(link => {
+    link.addEventListener('click', handleNavigation);
+  });
+
+  // Project selection
+  document.getElementById('project-select').addEventListener('change', handleProjectSelect);
+  document.getElementById('btn-new-project').addEventListener('click', showNewProjectModal);
+  document.getElementById('btn-create-project').addEventListener('click', createNewProject);
+
+  // Dashboard feature links
+  document.getElementById('feature-discovery-btn').addEventListener('click', () => {
+    document.getElementById('nav-discovery').click();
+  });
+  document.getElementById('feature-analysis-btn').addEventListener('click', () => {
+    document.getElementById('nav-analysis').click();
+  });
+  document.getElementById('feature-roadmap-btn').addEventListener('click', () => {
+    document.getElementById('nav-roadmap').click();
+  });
+  document.getElementById('dashboard-get-started').addEventListener('click', () => {
+    document.getElementById('btn-new-project').click();
+  });
+
+  // Discovery
+  document.getElementById('discovery-form').addEventListener('submit', startDiscovery);
+  
+  // Analysis
+  document.getElementById('btn-run-analysis').addEventListener('click', runAnalysis);
+  document.getElementById('recommendations-table').addEventListener('click', handleRecommendationClick);
+  
+  // Costs
+  document.getElementById('btn-run-cost-estimation').addEventListener('click', runCostEstimation);
+  
+  // Roadmap
+  document.getElementById('btn-generate-roadmap').addEventListener('click', generateRoadmap);
+}
+
+// Update dashboard statistics
+function updateDashboardStats() {
+  const currentProject = getCurrentProject();
+  
+  if (currentProject) {
+    // Get stored data from localStorage or generate mock data
+    let stats = JSON.parse(localStorage.getItem(`migration-stats-${currentProject.id}`)) || generateMockStats();
+    
+    // Update UI with values
+    document.getElementById('total-servers-stats').textContent = stats.totalServers;
+    document.getElementById('migrated-servers-stats').textContent = stats.migratedServers;
+    document.getElementById('monthly-cost-stats').textContent = formatCurrency(stats.monthlyCost);
+    document.getElementById('completion-stats').textContent = stats.completionRate + '%';
+    
+    // Update progress bar
+    const progressBar = document.getElementById('migration-progress-bar');
+    progressBar.style.width = stats.completionRate + '%';
+    progressBar.setAttribute('aria-valuenow', stats.completionRate);
+    
+    // Animate the stats
+    animateValue(document.getElementById('total-servers-stats'), 0, stats.totalServers, 1500);
+    animateValue(document.getElementById('migrated-servers-stats'), 0, stats.migratedServers, 1500);
+    animateValue(document.getElementById('completion-stats'), 0, stats.completionRate, 1500);
+  } else {
+    // If no project is selected, show zeros
+    document.getElementById('total-servers-stats').textContent = '0';
+    document.getElementById('migrated-servers-stats').textContent = '0';
+    document.getElementById('monthly-cost-stats').textContent = '$0';
+    document.getElementById('completion-stats').textContent = '0%';
+    
+    // Reset progress bar
+    const progressBar = document.getElementById('migration-progress-bar');
+    progressBar.style.width = '0%';
+    progressBar.setAttribute('aria-valuenow', 0);
+  }
+}
+
+// Generate mock statistics for a project
+function generateMockStats() {
+  const totalServers = Math.floor(Math.random() * 20) + 5;
+  const migratedServers = Math.floor(Math.random() * totalServers);
+  const completionRate = Math.floor((migratedServers / totalServers) * 100);
+  const monthlyCost = Math.floor(Math.random() * 5000) + 1000;
+  
+  return {
+    totalServers,
+    migratedServers,
+    completionRate, 
+    monthlyCost
+  };
+}
+
+// Initialize UI elements
+function initUI() {
+  // Show active view
+  const activeNavLink = document.querySelector('.nav-link.active');
+  if (activeNavLink) {
+    const targetViewId = activeNavLink.id.replace('nav-', '') + '-view';
+    document.querySelectorAll('.content-view').forEach(view => {
+      view.classList.remove('active');
+    });
+    document.getElementById(targetViewId)?.classList.add('active');
+  }
+  
+  // Initialize animations for dashboard
+  if (document.getElementById('dashboard-view').classList.contains('active')) {
+    animateElements('.feature-card', 'animate-fade-in', 200);
+    animateElements('.stats-card', 'animate-slide-up', 100);
+  }
+}
+
+// Handle navigation between views
+function handleNavigation(event) {
+  event.preventDefault();
+  
+  // Update active navigation link
+  document.querySelectorAll('.nav-link').forEach(link => {
+    link.classList.remove('active');
+  });
+  this.classList.add('active');
+  
+  // Show the corresponding view
+  const targetViewId = this.id.replace('nav-', '') + '-view';
+  document.querySelectorAll('.content-view').forEach(view => {
+    view.classList.remove('active');
+  });
+  document.getElementById(targetViewId).classList.add('active');
+  
+  // Initialize animations for the active view
+  if (targetViewId === 'dashboard-view') {
+    animateElements('.feature-card', 'animate-fade-in', 200);
+    animateElements('.stats-card', 'animate-slide-up', 100);
+  }
+}
+
+// Handle project selection
+function handleProjectSelect() {
+  const projectId = this.value;
+  if (projectId) {
+    // Load the selected project
+    const project = getProjectById(projectId);
+    if (project) {
+      setCurrentProject(project);
+      updateProjectStatus(project);
+      updateDashboardStats();
+      showNotification(`Project "${project.name}" loaded successfully`, 'success');
+    }
+  } else {
+    // No project selected
+    removeCurrentProject();
+    updateProjectStatus();
+    updateDashboardStats();
+  }
+}
+
+// Show new project modal
+function showNewProjectModal() {
+  // Clear form fields
+  document.getElementById('project-name').value = '';
+  document.getElementById('project-id').value = '';
+  
+  // Show modal
+  const modal = new bootstrap.Modal(document.getElementById('new-project-modal'));
+  modal.show();
+}
+
+// Create a new project
+function createNewProject() {
+  const projectName = document.getElementById('project-name').value.trim();
+  const projectId = document.getElementById('project-id').value.trim();
+  
+  if (!projectName || !projectId) {
+    showNotification('Please fill in all fields', 'error');
+    return;
+  }
+  
+  if (!/^[a-z0-9-]+$/.test(projectId)) {
+    showNotification('Project ID can only contain lowercase letters, numbers, and hyphens', 'error');
+    return;
+  }
+  
+  // Check if project ID already exists
+  if (getProjectById(projectId)) {
+    showNotification('Project ID already exists. Please choose a different one.', 'error');
+    return;
+  }
+  
+  // Create project object
+  const project = {
+    id: projectId,
+    name: projectName,
+    status: CONFIG.STATUS.CREATED,
+    createdAt: new Date().toISOString()
+  };
+  
+  // Save project
+  saveProject(project);
+  
+  // Set as current project
+  setCurrentProject(project);
+  
+  // Update UI
+  loadProjects();
+  updateProjectStatus(project);
+  
+  // Close modal
+  bootstrap.Modal.getInstance(document.getElementById('new-project-modal')).hide();
+  
+  // Show success notification
+  showNotification(`Project "${projectName}" created successfully`, 'success');
+  
+  // Generate mock stats for the new project
+  const stats = generateMockStats();
+  localStorage.setItem(`migration-stats-${projectId}`, JSON.stringify(stats));
+  
+  // Update dashboard stats
+  updateDashboardStats();
+}
+
+// Start discovery process
+function startDiscovery(event) {
+  event.preventDefault();
+  
+  const currentProject = getCurrentProject();
+  if (!currentProject) {
+    showNotification('Please select a project first', 'error');
+    return;
+  }
+  
+  const agentIds = document.getElementById('agent-ids').value.trim();
+  if (!agentIds) {
+    showNotification('Please enter at least one Agent ID', 'error');
+    return;
+  }
+  
+  // Show progress indicator
+  const progressElement = document.getElementById('discovery-progress');
+  progressElement.classList.remove('d-none');
+  
+  // Simulate discovery process
+  let progress = 0;
+  const progressBar = document.getElementById('discovery-progress-bar');
+  const statusText = document.getElementById('discovery-status');
+  
+  const interval = setInterval(() => {
+    progress += 5;
+    progressBar.style.width = progress + '%';
+    progressBar.setAttribute('aria-valuenow', progress);
+    
+    if (progress < 30) {
+      statusText.textContent = 'Connecting to discovery agents...';
+    } else if (progress < 60) {
+      statusText.textContent = 'Collecting infrastructure data...';
+    } else if (progress < 90) {
+      statusText.textContent = 'Processing collected data...';
+    } else {
+      statusText.textContent = 'Finalizing discovery...';
+    }
+    
+    if (progress >= 100) {
+      clearInterval(interval);
+      
+      // Update project status
+      currentProject.status = CONFIG.STATUS.DISCOVERY_PROCESSED;
+      saveProject(currentProject);
+      updateProjectStatus(currentProject);
+      
+      // Show success notification
+      showNotification('Discovery completed successfully', 'success');
+      
+      // Update dashboard stats
+      updateDashboardStats();
+      
+      // Hide progress after a delay
+      setTimeout(() => {
+        progressElement.classList.add('d-none');
+      }, 2000);
+    }
+  }, 200);
+}
+
+// Run analysis on the current project
+function runAnalysis() {
+  const currentProject = getCurrentProject();
+  if (!currentProject) {
+    showNotification('Please select a project first', 'error');
+    return;
+  }
+  
+  if (currentProject.status.text === CONFIG.STATUS.CREATED.text) {
+    showNotification('Please run discovery first', 'warning');
+    document.getElementById('nav-discovery').click();
+    return;
+  }
+  
+  // Show loading indicator
+  document.getElementById('btn-run-analysis').disabled = true;
+  document.getElementById('btn-run-analysis').innerHTML = '<i class="bi bi-arrow-repeat spin"></i> Running...';
+  
+  // Simulate API call
+  setTimeout(() => {
+    // Get or generate analysis data
+    const analysisData = getAnalysisData(currentProject.id);
+    
+    // Update UI
+    updateAnalysisUI(analysisData);
+    
+    // Update project status
+    currentProject.status = CONFIG.STATUS.ANALYSIS_COMPLETED;
+    saveProject(currentProject);
+    updateProjectStatus(currentProject);
+    
+    // Reset button
+    document.getElementById('btn-run-analysis').disabled = false;
+    document.getElementById('btn-run-analysis').innerHTML = '<i class="bi bi-arrow-repeat"></i> Run Analysis';
+    
+    // Show success notification
+    showNotification('Analysis completed successfully', 'success');
+  }, 2000);
+}
+
+// Run cost estimation for the current project
+function runCostEstimation() {
+  const currentProject = getCurrentProject();
+  if (!currentProject) {
+    showNotification('Please select a project first', 'error');
+    return;
+  }
+  
+  if (currentProject.status.text === CONFIG.STATUS.CREATED.text || 
+      currentProject.status.text === CONFIG.STATUS.DISCOVERY_STARTED.text) {
+    showNotification('Please run analysis first', 'warning');
+    document.getElementById('nav-analysis').click();
+    return;
+  }
+  
+  // Show loading indicator
+  document.getElementById('btn-run-cost-estimation').disabled = true;
+  document.getElementById('btn-run-cost-estimation').innerHTML = '<i class="bi bi-arrow-repeat spin"></i> Running...';
+  
+  // Simulate API call
+  setTimeout(() => {
+    // Get or generate cost data
+    const costData = getCostData(currentProject.id);
+    
+    // Update UI
+    updateCostsUI(costData);
+    
+    // Create cost breakdown chart
+    createCostBreakdownChart(costData);
+    
+    // Update project status
+    currentProject.status = CONFIG.STATUS.COST_ESTIMATION_COMPLETED;
+    saveProject(currentProject);
+    updateProjectStatus(currentProject);
+    
+    // Reset button
+    document.getElementById('btn-run-cost-estimation').disabled = false;
+    document.getElementById('btn-run-cost-estimation').innerHTML = '<i class="bi bi-arrow-repeat"></i> Run Cost Estimation';
+    
+    // Show success notification
+    showNotification('Cost estimation completed successfully', 'success');
+  }, 2000);
+}
+
+// Create cost breakdown chart
+function createCostBreakdownChart(costData) {
+  const ctx = document.getElementById('cost-breakdown-chart').getContext('2d');
+  
+  // Destroy previous chart if it exists
+  if (window.costBreakdownChart) {
+    window.costBreakdownChart.destroy();
+  }
+  
+  // Prepare data
+  const strategies = Object.keys(costData.strategyCosts);
+  const costs = Object.values(costData.strategyCosts);
+  
+  // Create chart
+  window.costBreakdownChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: strategies,
+      datasets: [{
+        label: 'Monthly Cost ($)',
+        data: costs,
+        backgroundColor: CONFIG.CHART_COLORS.background,
+        borderColor: CONFIG.CHART_COLORS.border,
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: false
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            callback: function(value) {
+              return '$' + value;
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+// Generate roadmap for the current project
+function generateRoadmap() {
+  const currentProject = getCurrentProject();
+  if (!currentProject) {
+    showNotification('Please select a project first', 'error');
+    return;
+  }
+  
+  if (currentProject.status.text === CONFIG.STATUS.CREATED.text || 
+      currentProject.status.text === CONFIG.STATUS.DISCOVERY_STARTED.text) {
+    showNotification('Please run analysis first', 'warning');
+    document.getElementById('nav-analysis').click();
+    return;
+  }
+  
+  // Show loading indicator
+  document.getElementById('btn-generate-roadmap').disabled = true;
+  document.getElementById('btn-generate-roadmap').innerHTML = '<i class="bi bi-arrow-repeat spin"></i> Generating...';
+  
+  // Simulate API call
+  setTimeout(() => {
+    // Get or generate roadmap data
+    const roadmapData = getRoadmapData(currentProject.id);
+    
+    // Update UI
+    updateRoadmapUI(roadmapData);
+    
+    // Update project status
+    currentProject.status = CONFIG.STATUS.ROADMAP_GENERATED;
+    saveProject(currentProject);
+    updateProjectStatus(currentProject);
+    
+    // Reset button
+    document.getElementById('btn-generate-roadmap').disabled = false;
+    document.getElementById('btn-generate-roadmap').innerHTML = '<i class="bi bi-arrow-repeat"></i> Generate Roadmap';
+    
+    // Show success notification
+    showNotification('Roadmap generated successfully', 'success');
+  }, 2000);
+}
+
+// Handle clicking on a recommendation in the table
+function handleRecommendationClick(event) {
+  const button = event.target.closest('.btn-view-details');
+  if (button) {
+    const serverId = button.dataset.serverId;
+    showServerDetails(serverId);
+  }
+}
+
+// Show server details modal
+function showServerDetails(serverId) {
+  const currentProject = getCurrentProject();
+  if (!currentProject) return;
+  
+  // Get server data
+  const analysisData = getAnalysisData(currentProject.id);
+  const server = analysisData.servers.find(s => s.id === serverId);
+  
+  if (!server) {
+    showNotification('Server details not found', 'error');
+    return;
+  }
+  
+  // Populate modal content
+  const content = document.getElementById('server-details-content');
+  content.innerHTML = `
+    <div class="server-details-section">
+      <h6>Server Information</h6>
+      <div class="detail-item">
+        <div class="detail-label">Name:</div>
+        <div class="detail-value">${server.name}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-label">Operating System:</div>
+        <div class="detail-value">${server.specs.os}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-label">CPU:</div>
+        <div class="detail-value">${server.specs.cpu}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-label">Memory:</div>
+        <div class="detail-value">${server.specs.memory}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-label">Storage:</div>
+        <div class="detail-value">${server.specs.storage}</div>
+      </div>
+    </div>
+    
+    <div class="server-details-section">
+      <h6>Migration Recommendation</h6>
+      <div class="detail-item">
+        <div class="detail-label">Strategy:</div>
+        <div class="detail-value">
+          <span class="strategy-tag ${CONFIG.STRATEGIES[server.recommendation.strategy].class}">
+            ${server.recommendation.strategy}
+          </span>
+        </div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-label">Target Service:</div>
+        <div class="detail-value">
+          <span class="service-tag">${server.recommendation.targetService}</span>
+        </div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-label">Reasoning:</div>
+        <div class="detail-value">${server.recommendation.reasoning}</div>
+      </div>
+    </div>
+    
+    <div class="server-details-section">
+      <h6>Estimated Costs</h6>
+      <div class="detail-item">
+        <div class="detail-label">Monthly Cost:</div>
+        <div class="detail-value">${formatCurrency(server.costs.monthly)}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-label">Yearly Cost:</div>
+        <div class="detail-value">${formatCurrency(server.costs.yearly)}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-label">Upfront Migration Cost:</div>
+        <div class="detail-value">${formatCurrency(server.costs.upfront)}</div>
+      </div>
+    </div>
+  `;
+  
+  // Show modal
+  const modal = new bootstrap.Modal(document.getElementById('server-details-modal'));
+  modal.show();
+}
+
+// Format currency values
+function formatCurrency(value) {
+  return '$' + value.toLocaleString('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  });
+}
+
+// Update project status in UI
+function updateProjectStatus(project) {
+  const statusElement = document.getElementById('project-status');
+  
+  if (project) {
+    statusElement.innerHTML = `<span class="badge bg-${project.status.color}">${project.status.text}</span>`;
+  } else {
+    statusElement.innerHTML = `<span class="badge bg-secondary">No Project Selected</span>`;
+  }
+}
+
+// Load projects from local storage and populate select dropdown
+function loadProjects() {
+  // Get projects from localStorage
+  const projects = getProjects();
+  
+  // Get select element
+  const select = document.getElementById('project-select');
+  
+  // Clear options (except the first one)
+  while (select.options.length > 1) {
+    select.remove(1);
+  }
+  
+  // Add project options
+  projects.forEach(project => {
+    const option = document.createElement('option');
+    option.value = project.id;
+    option.textContent = project.name;
+    select.appendChild(option);
+  });
+}
+
+// Load current project
+function loadCurrentProject() {
+  const currentProject = getCurrentProject();
+  
+  if (currentProject) {
+    // Select the current project in the dropdown
+    const select = document.getElementById('project-select');
+    for (let i = 0; i < select.options.length; i++) {
+      if (select.options[i].value === currentProject.id) {
+        select.selectedIndex = i;
+        break;
+      }
+    }
+    
+    // Update UI
+    updateProjectStatus(currentProject);
+  }
+}
+
+// Get projects from local storage
+function getProjects() {
+  const projectsJson = localStorage.getItem(CONFIG.STORAGE.PROJECTS);
+  return projectsJson ? JSON.parse(projectsJson) : [];
+}
+
+// Get project by ID
+function getProjectById(id) {
+  const projects = getProjects();
+  return projects.find(project => project.id === id);
+}
+
+// Save project to local storage
+function saveProject(project) {
+  const projects = getProjects();
+  
+  // Update if project exists, otherwise add new
+  const index = projects.findIndex(p => p.id === project.id);
+  if (index !== -1) {
+    projects[index] = project;
+  } else {
+    projects.push(project);
+  }
+  
+  // Save to localStorage
+  localStorage.setItem(CONFIG.STORAGE.PROJECTS, JSON.stringify(projects));
+}
+
+// Get current project from local storage
+function getCurrentProject() {
+  const projectId = localStorage.getItem(CONFIG.STORAGE.CURRENT_PROJECT);
+  return projectId ? getProjectById(projectId) : null;
+}
+
+// Set current project in local storage
+function setCurrentProject(project) {
+  localStorage.setItem(CONFIG.STORAGE.CURRENT_PROJECT, project.id);
+}
+
+// Remove current project selection
+function removeCurrentProject() {
+  localStorage.removeItem(CONFIG.STORAGE.CURRENT_PROJECT);
+}

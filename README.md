@@ -1,6 +1,6 @@
 # Cloud Migration Strategy Planner
 
-A comprehensive web application that helps businesses plan and execute their migration to AWS cloud services. This tool provides infrastructure discovery, migration analysis, cost estimation, and roadmap generation.
+A comprehensive web application that helps businesses plan and execute their migration to AWS cloud services. This tool provides infrastructure discovery, migration analysis, cost estimation, and roadmap generation with an intuitive, modern user interface.
 
 ## Features
 
@@ -8,6 +8,9 @@ A comprehensive web application that helps businesses plan and execute their mig
 - **Migration Analysis**: Get recommendations for migration strategies (rehost, replatform, rearchitect)
 - **Cost Estimation**: Calculate projected AWS migration and operational costs
 - **Migration Roadmap**: Generate detailed migration timelines with phases and tasks
+- **Modern UI/UX**: Sleek, responsive design with dark mode support
+- **Interactive Dashboard**: View migration statistics and progress at a glance
+- **Animated Components**: Enhanced user experience with smooth animations and transitions
 
 ## Technology Stack
 
@@ -23,11 +26,23 @@ A comprehensive web application that helps businesses plan and execute their mig
 - HTML5, CSS3, JavaScript
 - Bootstrap 5
 - Chart.js
+- CSS Custom Properties (for theming)
+- Intersection Observer API (for animations)
+
+## UI Features
+
+- **Dark/Light Mode**: Toggle between dark and light themes based on preference
+- **Responsive Design**: Works on desktop, tablet, and mobile devices
+- **Modern Card Layout**: Clean, shadowed cards with hover animations
+- **Interactive Components**: Animated stats, progress bars, and timeline
+- **Notification System**: Toast-style notifications for feedback
+- **Data Visualization**: Enhanced charts and graphical representations
+- **Improved Navigation**: Intuitive menu with clear iconography
 
 ## Getting Started
 
 ### Prerequisites
-- Node.js (v14.x or higher)
+- Node.js (v18.x or higher)
 - AWS CLI configured with appropriate credentials
 - AWS SAM CLI
 
@@ -35,7 +50,7 @@ A comprehensive web application that helps businesses plan and execute their mig
 
 1. Clone the repository:
    ```
-   git clone https://github.com/yourusername/cloud-migration-strategy-planner.git
+   git clone https://github.com/suguslove10/cloud-migration-strategy-planner.git
    cd cloud-migration-strategy-planner
    ```
 
@@ -93,6 +108,12 @@ npm run deploy-frontend # Frontend deployment
 ## Demo Mode
 
 When running locally or without backend connectivity, the application operates in a demo mode using mock data, allowing you to test all features.
+
+## Screenshots
+
+![Dashboard](https://example.com/screenshots/dashboard.png)
+![Migration Analysis](https://example.com/screenshots/analysis.png)
+![Migration Roadmap](https://example.com/screenshots/roadmap.png)
 
 ## License
 

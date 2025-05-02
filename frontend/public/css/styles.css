@@ -252,4 +252,33 @@
 
 .server-list-name {
   font-weight: 500;
+}
+
+/* Spinning animation */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+  display: inline-block;
+}
+
+/* Search feature */
+.search-container {
+  position: relative;
+  margin-bottom: 1rem;
+}
+
+.search-container .form-control {
+  padding-right: 40px;
+}
+
+.search-container .search-icon {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #6c757d;
 } 
